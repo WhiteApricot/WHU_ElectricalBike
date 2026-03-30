@@ -1,4 +1,16 @@
-﻿# WHU Electrical Bike Backend
+﻿---
+title: WHU ElectricalBike
+emoji: 🌍
+colorFrom: blue
+colorTo: green
+sdk: docker
+pinned: false
+---
+
+## Warning
+**更新README时，不要删除以上内容，以便Hugging Face远程部署正常！！**
+
+# WHU Electrical Bike Backend
 
 本仓库已经补充了一套可运行的 FastAPI 后端基础环境，用于武汉大学校园电单车 WebGIS 系统的后端联调与后续算法接入。
 
