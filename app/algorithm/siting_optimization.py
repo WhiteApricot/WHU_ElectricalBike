@@ -6,6 +6,7 @@ def run_siting_optimization(algorithm_type: str, target_sites_count: int, servic
 
     预期功能：
     - 根据前端指定的算法类型，调用对应的选址算法实现。
+    - 优先通过 `app.algorithm.data_loader` 读取校园路网、建筑、POI 等基础空间数据。
     - 读取候选站点、需求点、校园路网等输入数据。
     - 计算最优停车点布局、覆盖范围以及总体评价指标。
     - 当 `include_process=True` 时，额外准备算法过程可视化所需的中间状态信息。
@@ -135,3 +136,4 @@ def build_siting_process_states(result: dict) -> list[dict]:
       - `artifacts: dict`：可视化产物，如候选站点 GeoJSON、覆盖圈预览等
     """
     raise NotImplementedError('选址过程状态构建函数尚未实现。')
+

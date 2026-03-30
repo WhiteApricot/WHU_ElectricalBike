@@ -6,6 +6,7 @@ def run_dispatch_routing(period, algorithm_type: str, include_process: bool = Fa
 
     预期功能：
     - 根据给定时段和算法类型，生成调度车辆路径、转运方案和效率指标。
+    - 优先通过 `app.algorithm.data_loader` 读取校园路网、建筑、POI 等基础空间数据。
     - 当 `include_process=True` 时，同时为前端准备过程可视化所需的中间状态。
 
     输入参数：

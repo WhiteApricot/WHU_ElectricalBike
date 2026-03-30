@@ -3,9 +3,9 @@ cache/
 *.docx
 接口及需求.md
 whu_data/
-whu_spatial_data/
 get_whu_osm_data.py
 shp2geojson.py
+log/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

@@ -6,6 +6,7 @@ def predict_demand(period) -> dict:
 
     预期功能：
     - 根据时间段、历史轨迹、站点状态等信息预测各站点未来需求。
+    - 优先通过 `app.algorithm.data_loader` 读取 POI、建筑、路网等基础空间数据。
     - 输出每个站点的当前车辆数、预测需求数、调入/调出建议数量。
 
     输入参数：
