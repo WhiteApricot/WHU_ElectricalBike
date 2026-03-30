@@ -25,6 +25,10 @@ class DispatchStatusResponse(BaseModel):
 class DispatchOptimizeRequest(BaseModel):
     period: PeriodEnum
     algorithm_type: str = Field(default="ACO")
+    include_process: bool = Field(
+        default=False,
+        description="Whether to reserve and return algorithm process visualization metadata. / 是否返回算法过程可视化所需的运行信息。",
+    )
 
 
 class DispatchOptimizeResponse(BaseModel):
@@ -34,3 +38,6 @@ class DispatchOptimizeResponse(BaseModel):
     dispatch_routes: dict[str, Any]
     transfer_plan: list[dict[str, Any]] = Field(default_factory=list)
     efficiency_metrics: dict[str, Any]
+    process_available: bool = False
+    run_id: str | None = None
+    process_summary: dict[str, Any] | None = None

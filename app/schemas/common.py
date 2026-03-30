@@ -14,3 +14,11 @@ class SchemeTypeEnum(str, Enum):
     dispatch = "dispatch"
     analysis = "analysis"
     mixed = "mixed"
+
+
+class AlgorithmDomainEnum(str, Enum):
+    siting = "siting"
+    dispatch = "dispatch"
+    demand = "demand"
+    evaluation = "evaluation"
+    analysis = "analysis"

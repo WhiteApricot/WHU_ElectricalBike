@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from typing import Any
 
@@ -17,6 +17,10 @@ class SitingOptimizeRequest(BaseModel):
     algorithm_type: str = Field(default="GA")
     target_sites_count: int = Field(default=5, ge=1)
     service_radius: float = Field(default=120.0, gt=0)
+    include_process: bool = Field(
+        default=False,
+        description="Whether to reserve and return algorithm process visualization metadata. / 是否返回算法过程可视化所需的运行信息。",
+    )
 
 
 class SitingOptimizeResponse(BaseModel):
@@ -25,6 +29,9 @@ class SitingOptimizeResponse(BaseModel):
     optimal_sites: dict[str, Any]
     coverage_areas: dict[str, Any]
     global_metrics: dict[str, Any]
+    process_available: bool = False
+    run_id: str | None = None
+    process_summary: dict[str, Any] | None = None
 
 
 class SitingEvaluateRequest(BaseModel):

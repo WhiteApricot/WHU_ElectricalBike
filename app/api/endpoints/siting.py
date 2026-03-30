@@ -2,16 +2,8 @@
 
 from fastapi import APIRouter
 
-from app.schemas.siting import (
-    SitingEvaluateRequest,
-    SitingEvaluateResponse,
-    SitingOptimizeRequest,
-    SitingOptimizeResponse,
-)
-from app.services.mock_data import (
-    build_siting_evaluate_response,
-    build_siting_optimize_response,
-)
+from app.schemas.siting import SitingEvaluateRequest, SitingEvaluateResponse, SitingOptimizeRequest, SitingOptimizeResponse
+from app.services.mock_data import build_siting_evaluate_response, build_siting_optimize_response
 
 
 router = APIRouter()
@@ -21,16 +13,10 @@ router = APIRouter()
     "/siting/optimize",
     response_model=SitingOptimizeResponse,
     summary="Optimize Siting Layout / 智能选址优化",
-    description="Run the siting optimization stub and return GeoJSON-like result structures for frontend testing. / 运行选址优化占位逻辑，返回前端调试所需的 GeoJSON 结构。",
+    description="Run the siting optimization stub and optionally return a process run id for visualization. / 运行选址优化占位逻辑，并可返回过程可视化所需的运行 ID。",
 )
 def optimize_siting(payload: SitingOptimizeRequest) -> SitingOptimizeResponse:
-    return SitingOptimizeResponse(
-        **build_siting_optimize_response(
-            algorithm_type=payload.algorithm_type,
-            target_sites_count=payload.target_sites_count,
-            service_radius=payload.service_radius,
-        )
-    )
+    return SitingOptimizeResponse(**build_siting_optimize_response(payload.algorithm_type, payload.target_sites_count, payload.service_radius, payload.include_process))
 
 
 @router.post(
