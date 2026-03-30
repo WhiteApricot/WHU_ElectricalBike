@@ -1,0 +1,26 @@
+name: Sync to Hugging Face Hub
+on:
+  push:
+    branches: [main] # 如果你们的主分支叫 master，这里就改成 master
+
+  # 允许手动在 GitHub 网页上触发同步
+  workflow_dispatch:
+
+jobs:
+  sync-to-hub:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          lfs: true
+      - name: Push to hub
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          # 配置 git 用户名和邮箱
+          git config --global user.email "whiteapricot666@gmail.com"
+          git config --global user.name "WhiteApricot"
+          # 添加 Hugging Face 为远程仓库并强制推送
+          git remote add hf https://aaa22234sa:$HF_TOKEN@huggingface.co/spaces/aaa22234sa/WHU_ElectricalBike
+          git push hf main --force
