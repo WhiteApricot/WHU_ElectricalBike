@@ -1,0 +1,38 @@
+from __future__ import annotations
+
+from typing import Any
+
+from pydantic import BaseModel, Field
+
+
+class SiteInput(BaseModel):
+    site_id: str | None = None
+    name: str | None = None
+    latitude: float
+    longitude: float
+    capacity: int = Field(default=0, ge=0)
+
+
+class SitingOptimizeRequest(BaseModel):
+    algorithm_type: str = Field(default="GA")
+    target_sites_count: int = Field(default=5, ge=1)
+    service_radius: float = Field(default=120.0, gt=0)
+
+
+class SitingOptimizeResponse(BaseModel):
+    status: str = "mock"
+    algorithm_type: str
+    optimal_sites: dict[str, Any]
+    coverage_areas: dict[str, Any]
+    global_metrics: dict[str, Any]
+
+
+class SitingEvaluateRequest(BaseModel):
+    current_sites: list[SiteInput] = Field(default_factory=list)
+
+
+class SitingEvaluateResponse(BaseModel):
+    status: str = "mock"
+    evaluated_sites_count: int
+    coverage_areas: dict[str, Any]
+    global_metrics: dict[str, Any]
