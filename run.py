@@ -9,7 +9,7 @@ if __name__ == "__main__":
     log_file = create_runtime_log_file()
     uvicorn.run(
         "app.main:app",
-        host="127.0.0.1",
+        host="0.0.0.0",
         port=7860,
         reload=True,
         access_log=False,
