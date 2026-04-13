@@ -32,6 +32,7 @@ class SitingOptimizeResponse(BaseModel):
     process_available: bool = False
     run_id: str | None = None
     process_summary: dict[str, Any] | None = None
+    process_states: list[dict[str, Any]] | None = None
 
 
 class SitingEvaluateRequest(BaseModel):
