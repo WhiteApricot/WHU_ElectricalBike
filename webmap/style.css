@@ -1,0 +1,149 @@
+/* E:\whu_electricalbike\webmap\style.css */
+
+html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+}
+
+/* 修复：将背景色改为深蓝灰色，保证无底图降级时依然美观 */
+#map {
+    width: 100%;
+    height: 100%;
+    background-color: #0b1220; 
+}
+
+/* 新增：脱网瓦片加载失败时的右下角 UI 提示 */
+.basemap-error-toast {
+    background: rgba(0, 0, 0, 0.8);
+    color: #e74c3c;
+    padding: 8px 12px;
+    border-radius: 4px;
+    font-size: 13px;
+    border: 1px solid #c0392b;
+    backdrop-filter: blur(2px);
+}
+
+/* 新增：Fetch 基础数据失败时的顶部报错 UI */
+.fetch-error-toast {
+    position: absolute;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1000;
+    background: rgba(192, 57, 43, 0.9);
+    color: #ffffff;
+    padding: 10px 20px;
+    border-radius: 6px;
+    font-size: 14px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+}
+
+/* 智能推荐点 (Neon Green) */
+.siting-point-marker {
+    filter: drop-shadow(0 0 8px rgba(46, 204, 113, 0.8));
+    cursor: pointer;
+    transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275), filter 0.2s;
+}
+
+.siting-point-marker:hover {
+    transform: scale(1.4);
+    filter: drop-shadow(0 0 15px rgba(46, 204, 113, 1));
+}
+
+/* 人工放置点 (Neon Orange) */
+.manual-site-marker {
+    background-color: #f39c12; 
+    border: 2px solid #fff;
+    border-radius: 50%;
+    box-shadow: 0 0 8px rgba(243, 156, 18, 0.8);
+    cursor: grab; 
+    transition: transform 0.1s, box-shadow 0.2s;
+}
+
+.manual-site-marker:active {
+    cursor: grabbing;
+    transform: scale(1.3);
+    box-shadow: 0 0 18px rgba(243, 156, 18, 1);
+}
+
+/* 覆盖范围 Polygon (Hover 反馈) */
+.siting-coverage-path {
+    transition: fill-opacity 0.3s ease, stroke-width 0.3s ease;
+}
+
+.siting-coverage-path:hover {
+    fill-opacity: 0.35 !important; 
+    stroke-width: 4px !important;
+    cursor: pointer;
+}
+
+/* 调度路线与动画 (Neon Flow) */
+.dispatch-route-line {
+    animation: dash-flow 1s linear infinite;
+    filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.3));
+}
+
+@keyframes dash-flow {
+    to { stroke-dashoffset: -25; }
+}
+
+.dispatch-vehicle-marker div {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    border: 2px solid #fff;
+    box-shadow: 0 0 10px rgba(255, 255, 255, 0.9);
+    animation: vehicle-pulse 1.2s infinite;
+}
+
+@keyframes vehicle-pulse {
+    0% { transform: scale(0.8); box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.6); }
+    70% { transform: scale(1.2); box-shadow: 0 0 0 8px rgba(255, 255, 255, 0); }
+    100% { transform: scale(0.8); box-shadow: 0 0 0 0 rgba(255, 255, 255, 0); }
+}
+
+/* 算法迭代过程 (低调的灰色系) */
+.process-candidate-site {
+    transition: all 0.2s ease-in-out;
+}
+
+.process-dispatch-route {
+    transition: stroke-dashoffset 0.2s linear;
+}
+
+/* 弹窗样式暗黑化 (Dark Mode Popup) */
+.leaflet-popup-content-wrapper, .leaflet-popup-tip {
+    background: rgba(30, 39, 46, 0.95);
+    color: #ecf0f1;
+    box-shadow: 0 0 15px rgba(0, 0, 0, 0.8);
+    backdrop-filter: blur(4px);
+}
+
+.siting-popup h4, .dispatch-popup h4 {
+    margin: 0 0 8px 0;
+    padding-bottom: 5px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.siting-popup h4 { color: #2ecc71; }
+.dispatch-popup h4 { color: #e74c3c; }
+
+.siting-popup p, .dispatch-popup p {
+    margin: 4px 0;
+    font-size: 13px;
+    color: #bdc3c7;
+}
+
+.siting-popup b, .dispatch-popup b {
+    color: #ecf0f1;
+}
+
+/* 新增：POI 点位的 Hover 反馈 */
+.campus-poi-marker {
+    transition: r 0.2s, fill-opacity 0.2s;
+}
+.campus-poi-marker:hover {
+    fill-opacity: 1 !important;
+}
