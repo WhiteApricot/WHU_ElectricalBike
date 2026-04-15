@@ -62,10 +62,8 @@ const MapEngine = {
             zoomControl: false 
         });
 
-        // ✨ 新增：创建热力图专属图层空间，层级设为 500 (普通建筑通常是 400)
         this.map.createPane('heatPane');
         this.map.getPane('heatPane').style.zIndex = 500;
-        // 关键：让鼠标点击事件穿透热力图，不然热力图下方的路线和点位就点不到了
         this.map.getPane('heatPane').style.pointerEvents = 'none';
 
         if (basemapType === 'cartoDark') {
@@ -168,7 +166,7 @@ const MapEngine = {
         }
     },
 
-    // ✨ 彻底改造的专属热力图渲染方法
+    // ✨ 彻底改造的专属热力图渲染方法 (修复：颜色渐变整体向“红”移动)
     renderHeatmap(points, options = {}) {
         this.layers.heatmap.clearLayers();
         if (!points || points.length === 0) return;
@@ -190,9 +188,14 @@ const MapEngine = {
             radius: options.radius || 55,         // 光晕更大
             blur: options.blur || 35,             // 边缘更柔和
             minOpacity: options.minOpacity || 0.45, // 保证最低权重也依然清晰可见
-            // 使用高级的赛博朋克渐变：青 -> 紫 -> 品红
-            gradient: options.gradient || { '0.2': '#22d3ee', '0.6': '#a78bfa', '1.0': '#f43f5e' },
-            pane: 'heatPane' // 🚨 指向刚刚在 init 中创建的 500 层级专属 pane
+            // 🚨 颜色渐变升级：更红、更暖的霓虹赛博朋克色系
+            // 从青色(0.1)到黄色(0.5)再到鲜艳红色(0.9)
+            gradient: options.gradient || { 
+                '0.1': '#22d3ee', // 亮青色，表示 cool 区域
+                '0.5': '#fcd34d', // 黄色，表示 warning 区域
+                '0.9': '#ef4444'  // 亮红色，表示极热、最高需求区域
+            },
+            pane: 'heatPane' // 指向在 init 中创建的 500 层级专属 pane
         };
 
         L.heatLayer(processedPoints, heatOptions).addTo(this.layers.heatmap);
