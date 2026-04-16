@@ -1,11 +1,10 @@
 ﻿from __future__ import annotations
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, HTTPException, Query
 
+from app.algorithm.dispatch_routing import build_site_status, run_dispatch_routing
 from app.schemas.common import PeriodEnum
 from app.schemas.dispatch import DispatchOptimizeRequest, DispatchOptimizeResponse, DispatchStatusResponse
-from app.services.mock_data import build_dispatch_optimize_response, build_dispatch_status
-
 
 router = APIRouter()
 
@@ -14,17 +13,39 @@ router = APIRouter()
     "/dispatch/status",
     response_model=DispatchStatusResponse,
     summary="Get Dispatch Status / 获取调度供需状态",
-    description="Return per-site supply and demand status for the selected period. Current response is mock data. / 返回指定时段各站点供需状态，当前为占位数据。",
+    description="Return per-site supply and demand status for the selected period. / 返回指定时段各站点供需状态。",
 )
-def get_dispatch_status(period: PeriodEnum = Query(..., description="Dispatch period: morning, noon, evening. / 调度时段：morning、noon、evening。")) -> DispatchStatusResponse:
-    return DispatchStatusResponse(**build_dispatch_status(period))
+def get_dispatch_status(
+    period: PeriodEnum = Query(..., description="Dispatch period: morning, noon, evening. / 调度时段：morning、noon、evening。")
+) -> DispatchStatusResponse:
+    try:
+        period_value = period.value if hasattr(period, "value") else str(period)
+
+        stations = build_site_status(period=period_value, site_count=12)
+        return DispatchStatusResponse(
+            status="success",
+            period=period_value,
+            stations=stations,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.post(
     "/dispatch/optimize",
     response_model=DispatchOptimizeResponse,
     summary="Optimize Dispatch Routes / 调度路径优化",
-    description="Run the dispatch optimization stub and optionally return a process run id for visualization. / 运行调度优化占位逻辑，并可返回过程可视化所需的运行 ID。",
+    description="Run the dispatch optimization and optionally return process states. / 运行调度优化，并可返回过程状态。",
 )
 def optimize_dispatch(payload: DispatchOptimizeRequest) -> DispatchOptimizeResponse:
-    return DispatchOptimizeResponse(**build_dispatch_optimize_response(payload.period, payload.algorithm_type, payload.include_process))
+    try:
+        period_value = payload.period.value if hasattr(payload.period, "value") else str(payload.period)
+
+        result = run_dispatch_routing(
+            period=period_value,
+            algorithm_type=payload.algorithm_type,
+            include_process=payload.include_process,
+        )
+        return DispatchOptimizeResponse(**result)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))

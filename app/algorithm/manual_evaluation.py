@@ -1,30 +1,76 @@
 ﻿from __future__ import annotations
 
+from app.algorithm.demand_prediction import build_demand_points
+from app.algorithm.siting_optimization import (
+    build_coverage_areas,
+    build_distance_matrix,
+    evaluate_solution,
+)
 
-def evaluate_manual_sites(current_sites: list) -> dict:
-    """人工选址评估入口函数。
 
-    预期功能：
-    - 接收前端当前手动调整后的停车点列表。
-    - 重新计算覆盖范围、覆盖率、平均步行距离、均衡性等指标。
-    - 返回与人工选址评估接口兼容的结果。
+def normalize_manual_sites(current_sites: list) -> list[dict]:
+    normalized = []
 
-    输入参数：
-    - `current_sites: list`
-      当前停车点列表。
-      列表元素应与 `SiteInput` 结构兼容，建议至少包含：
-      - `site_id`
-      - `name`
-      - `latitude`
-      - `longitude`
-      - `capacity`
+    for idx, site in enumerate(current_sites, start=1):
+        # 兼容 Pydantic model / dict 两种输入
+        if hasattr(site, "model_dump"):
+            raw = site.model_dump()
+        elif hasattr(site, "dict"):
+            raw = site.dict()
+        else:
+            raw = dict(site)
 
-    返回值格式：
-    - 返回 `dict`
-    - 字段应与 `SitingEvaluateResponse` 兼容，至少包含：
-      - `status: str`
-      - `evaluated_sites_count: int`
-      - `coverage_areas: GeoJSON FeatureCollection`
-      - `global_metrics: dict`
-    """
-    raise NotImplementedError('人工选址评估逻辑尚未实现。')
+        normalized.append({
+            "site_id": raw.get("site_id") or f"manual_{idx}",
+            "name": raw.get("name") or f"manual_site_{idx}",
+            "type": "manual",
+            "x": raw["longitude"],
+            "y": raw["latitude"],
+            "capacity": raw.get("capacity", 0),
+        })
+
+    return normalized
+
+
+def evaluate_manual_sites(
+    current_sites: list,
+    period: str = "morning",
+    service_radius: float = 120.0,
+) -> dict:
+    if period not in {"morning", "noon", "evening"}:
+        raise ValueError("period 必须为 morning / noon / evening")
+
+    selected_sites = normalize_manual_sites(current_sites)
+
+    if not selected_sites:
+        return {
+            "status": "success",
+            "evaluated_sites_count": 0,
+            "coverage_areas": {"type": "FeatureCollection", "features": []},
+            "global_metrics": {
+                "coverage_rate": 0.0,
+                "avg_walk_distance": 0.0,
+                "fitness": 0.0,
+                "period": period,
+            },
+        }
+
+    demand_points = build_demand_points()
+    distance_matrix = build_distance_matrix(demand_points, selected_sites)
+
+    _, metrics = evaluate_solution(
+        selected_sites=selected_sites,
+        demand_points=demand_points,
+        distance_matrix=distance_matrix,
+        service_radius=service_radius,
+        period=period,
+    )
+
+    metrics["period"] = period
+
+    return {
+        "status": "success",
+        "evaluated_sites_count": len(selected_sites),
+        "coverage_areas": build_coverage_areas(selected_sites, service_radius),
+        "global_metrics": metrics,
+    }

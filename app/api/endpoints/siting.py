@@ -3,6 +3,7 @@
 from fastapi import APIRouter, HTTPException
 
 from app.algorithm.siting_optimization import run_siting_optimization
+from app.algorithm.manual_evaluation import evaluate_manual_sites
 from app.schemas.siting import (
     SitingEvaluateRequest,
     SitingEvaluateResponse,
@@ -40,4 +41,12 @@ def optimize_siting(payload: SitingOptimizeRequest) -> SitingOptimizeResponse:
     description="Evaluate a manually edited siting plan. / 对人工编辑的选址方案进行评估。",
 )
 def evaluate_siting(payload: SitingEvaluateRequest) -> SitingEvaluateResponse:
-    raise HTTPException(status_code=501, detail="manual evaluation 尚未实现，下一步再接。")
+    try:
+        result = evaluate_manual_sites(
+            current_sites=payload.current_sites,
+            period="morning",
+            service_radius=120.0,
+        )
+        return SitingEvaluateResponse(**result)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
