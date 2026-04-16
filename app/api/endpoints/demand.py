@@ -4,7 +4,7 @@ from fastapi import APIRouter, Query
 
 from app.schemas.common import PeriodEnum
 from app.schemas.demand import HeatmapResponse
-from app.services.mock_data import build_heatmap
+from app.algorithm.demand_prediction import build_heatmap_output
 
 
 router = APIRouter()
@@ -19,4 +19,5 @@ router = APIRouter()
 def get_demand_heatmap(
     period: PeriodEnum = Query(..., description="Demand period: morning, noon, evening. / 需求时段：morning、noon、evening。"),
 ) -> HeatmapResponse:
-    return HeatmapResponse(**build_heatmap(period))
+    period_value = period.value if hasattr(period, "value") else str(period)
+    return HeatmapResponse(**build_heatmap_output(period_value))

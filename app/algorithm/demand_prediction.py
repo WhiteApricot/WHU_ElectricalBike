@@ -180,3 +180,25 @@ def build_prediction_process_states(model_output: dict) -> list[dict]:
             "artifacts": {},
         }
     ]
+
+def build_heatmap_output(period: str) -> dict:
+    """
+    基于真实需求点构造热力图输出。
+    输出结构与 HeatmapResponse 兼容：
+    points = [[lat, lng, weight], ...]
+    """
+    model_output = predict_demand(period)
+
+    heatmap_points = []
+    for dp in model_output["demand_points"]:
+        heatmap_points.append([
+            dp["y"],                  # latitude
+            dp["x"],                  # longitude
+            dp["predicted_demand"],   # weight
+        ])
+
+    return {
+        "status": "success",
+        "period": period,
+        "points": heatmap_points,
+    }
