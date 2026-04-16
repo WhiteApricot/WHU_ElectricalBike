@@ -4,6 +4,7 @@ from app.algorithm.demand_prediction import build_demand_points
 from app.algorithm.siting_optimization import (
     build_coverage_areas,
     build_distance_matrix,
+    compute_site_service_stats,
     evaluate_solution,
 )
 
@@ -45,6 +46,7 @@ def evaluate_manual_sites(
     if not selected_sites:
         return {
             "status": "success",
+            "period": period,
             "evaluated_sites_count": 0,
             "coverage_areas": {"type": "FeatureCollection", "features": []},
             "global_metrics": {
@@ -66,11 +68,24 @@ def evaluate_manual_sites(
         period=period,
     )
 
+    site_stats = compute_site_service_stats(
+        selected_sites=selected_sites,
+        demand_points=demand_points,
+        distance_matrix=distance_matrix,
+        service_radius=service_radius,
+        period=period,
+    )
+
     metrics["period"] = period
 
     return {
         "status": "success",
+        "period": period,
         "evaluated_sites_count": len(selected_sites),
-        "coverage_areas": build_coverage_areas(selected_sites, service_radius),
+        "coverage_areas": build_coverage_areas(
+            selected_sites,
+            service_radius,
+            site_stats=site_stats,
+        ),
         "global_metrics": metrics,
     }

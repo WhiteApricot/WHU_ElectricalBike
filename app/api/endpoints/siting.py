@@ -2,8 +2,8 @@
 
 from fastapi import APIRouter, HTTPException
 
-from app.algorithm.siting_optimization import run_siting_optimization
 from app.algorithm.manual_evaluation import evaluate_manual_sites
+from app.algorithm.siting_optimization import run_siting_optimization
 from app.schemas.siting import (
     SitingEvaluateRequest,
     SitingEvaluateResponse,
@@ -24,7 +24,7 @@ def optimize_siting(payload: SitingOptimizeRequest) -> SitingOptimizeResponse:
     try:
         result = run_siting_optimization(
             algorithm_type=payload.algorithm_type,
-            period="morning",
+            period=payload.period,
             target_sites_count=payload.target_sites_count,
             service_radius=payload.service_radius,
             include_process=payload.include_process,
@@ -44,8 +44,8 @@ def evaluate_siting(payload: SitingEvaluateRequest) -> SitingEvaluateResponse:
     try:
         result = evaluate_manual_sites(
             current_sites=payload.current_sites,
-            period="morning",
-            service_radius=120.0,
+            period=payload.period,
+            service_radius=payload.service_radius,
         )
         return SitingEvaluateResponse(**result)
     except Exception as e:

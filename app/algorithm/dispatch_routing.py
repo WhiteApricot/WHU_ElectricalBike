@@ -173,6 +173,8 @@ def _build_dispatch_routes(transfer_plan: list[dict], stations: list[dict]) -> d
         from_site = station_map[item["from_site_id"]]
         to_site = station_map[item["to_site_id"]]
 
+        vehicle_id = f"vehicle_{idx}"
+
         features.append({
             "type": "Feature",
             "geometry": {
@@ -183,11 +185,18 @@ def _build_dispatch_routes(transfer_plan: list[dict], stations: list[dict]) -> d
                 ],
             },
             "properties": {
+                # 原有字段，继续保留
                 "route_id": f"route_{idx}",
                 "from_site_id": item["from_site_id"],
                 "to_site_id": item["to_site_id"],
                 "bikes": item["bikes"],
                 "distance": item["distance"],
+
+                # 给成员 C / webmap 用的兼容字段
+                "vehicle_id": vehicle_id,
+                "from_site": item["from_site_name"],
+                "to_site": item["to_site_name"],
+                "transfer_count": item["bikes"],
             },
         })
 

@@ -34,6 +34,24 @@ def haversine_distance(lon1: float, lat1: float, lon2: float, lat2: float) -> fl
     return r * c
 
 
+def build_circle_polygon(lon: float, lat: float, radius_m: float, num_points: int = 36) -> list[list[float]]:
+    import math
+
+    lat_rad = math.radians(lat)
+    dlat = radius_m / 111320.0
+    dlng = radius_m / (111320.0 * max(math.cos(lat_rad), 1e-6))
+
+    coords = []
+    for i in range(num_points):
+        angle = 2 * math.pi * i / num_points
+        y = lat + dlat * math.sin(angle)
+        x = lon + dlng * math.cos(angle)
+        coords.append([x, y])
+
+    coords.append(coords[0])
+    return coords
+
+
 def build_distance_matrix(demand_points: list[dict], candidate_sites: list[dict]) -> dict:
     matrix = {}
     for dp in demand_points:
@@ -45,7 +63,48 @@ def build_distance_matrix(demand_points: list[dict], candidate_sites: list[dict]
     return matrix
 
 
-def sites_to_feature_collection(sites: list[dict]) -> dict:
+def compute_site_service_stats(
+    selected_sites: list[dict],
+    demand_points: list[dict],
+    distance_matrix: dict,
+    service_radius: float,
+    period: str,
+) -> dict[str, dict]:
+    """
+    统计每个站点服务人数（当前时段）和建议容量。
+    served_people: 被该站点最近覆盖到的需求总量
+    capacity: 先按 served_people 的 30% 估一个建议容量，至少 10
+    """
+    selected_site_ids = [s["site_id"] for s in selected_sites]
+    site_stats = {
+        s["site_id"]: {
+            "served_people": 0,
+            "capacity": 0,
+        }
+        for s in selected_sites
+    }
+
+    for dp in demand_points:
+        nearest_site_id = min(
+            selected_site_ids,
+            key=lambda sid: distance_matrix[dp["demand_id"]][sid]
+        )
+        nearest_distance = distance_matrix[dp["demand_id"]][nearest_site_id]
+
+        if nearest_distance <= service_radius:
+            site_stats[nearest_site_id]["served_people"] += dp["demand"][period]
+
+    for sid, stats in site_stats.items():
+        served = stats["served_people"]
+        stats["served_people"] = int(round(served))
+        stats["capacity"] = max(10, int(round(served * 0.3)))
+
+    return site_stats
+
+
+def sites_to_feature_collection(sites: list[dict], site_stats: dict[str, dict] | None = None) -> dict:
+    site_stats = site_stats or {}
+
     return {
         "type": "FeatureCollection",
         "features": [
@@ -56,6 +115,8 @@ def sites_to_feature_collection(sites: list[dict]) -> dict:
                     "site_id": site["site_id"],
                     "name": site["name"],
                     "type": site["type"],
+                    "capacity": site_stats.get(site["site_id"], {}).get("capacity", site.get("capacity", 0)),
+                    "served_people": site_stats.get(site["site_id"], {}).get("served_people", 0),
                 },
             }
             for site in sites
@@ -63,16 +124,29 @@ def sites_to_feature_collection(sites: list[dict]) -> dict:
     }
 
 
-def build_coverage_areas(best_sites: list[dict], service_radius: float) -> dict:
+def build_coverage_areas(
+    best_sites: list[dict],
+    service_radius: float,
+    site_stats: dict[str, dict] | None = None,
+) -> dict:
+    site_stats = site_stats or {}
+
     return {
         "type": "FeatureCollection",
         "features": [
             {
                 "type": "Feature",
-                "geometry": {"type": "Point", "coordinates": [site["x"], site["y"]]},
+                "geometry": {
+                    "type": "Polygon",
+                    "coordinates": [
+                        build_circle_polygon(site["x"], site["y"], service_radius)
+                    ],
+                },
                 "properties": {
                     "site_id": site["site_id"],
                     "service_radius": service_radius,
+                    "capacity": site_stats.get(site["site_id"], {}).get("capacity", site.get("capacity", 0)),
+                    "served_people": site_stats.get(site["site_id"], {}).get("served_people", 0),
                 },
             }
             for site in best_sites
@@ -265,12 +339,22 @@ def run_siting_optimization(
         period=period,
     )
 
+    best_sites = result["best_sites"]
+    distance_matrix = build_distance_matrix(demand_points, best_sites)
+    site_stats = compute_site_service_stats(
+        selected_sites=best_sites,
+        demand_points=demand_points,
+        distance_matrix=distance_matrix,
+        service_radius=service_radius,
+        period=period,
+    )
+
     response = {
         "status": "success",
         "algorithm_type": "GA",
         "period": period,
-        "optimal_sites": sites_to_feature_collection(result["best_sites"]),
-        "coverage_areas": build_coverage_areas(result["best_sites"], service_radius),
+        "optimal_sites": sites_to_feature_collection(best_sites, site_stats=site_stats),
+        "coverage_areas": build_coverage_areas(best_sites, service_radius, site_stats=site_stats),
         "global_metrics": result["metrics"],
         "process_available": include_process,
         "process_summary": {
