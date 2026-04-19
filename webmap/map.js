@@ -31,13 +31,14 @@ const MapEngine = {
     map: null,
     layers: {
         campusBase: L.featureGroup(),
-        heatmap: L.layerGroup(),         
-        sitingSites: L.featureGroup(),     
-        sitingCoverage: L.featureGroup(),  
-        manualSites: L.featureGroup(),     
-        dispatchRoutes: L.featureGroup(),  
-        dispatchVehicles: L.layerGroup(),  
-        processArtifacts: L.featureGroup() 
+        heatmap: L.layerGroup(),
+        sitingSites: L.featureGroup(),
+        sitingCoverage: L.featureGroup(),
+        manualSites: L.featureGroup(),
+        manualCoverage: L.featureGroup(),
+        dispatchRoutes: L.featureGroup(),
+        dispatchVehicles: L.layerGroup(),
+        processArtifacts: L.featureGroup()
     },
     
     _events: {},
@@ -92,6 +93,43 @@ const MapEngine = {
         }
 
         Object.values(this.layers).forEach(layer => layer.addTo(this.map));
+
+        const legendControl = L.control({ position: 'bottomright' });
+        legendControl.onAdd = function () {
+            const div = document.createElement('div');
+            div.style.cssText = 'background:rgba(15,25,35,0.95);border:1px solid #2a3a4a;border-radius:8px;padding:8px 12px;font-size:11px;color:#e0e0e0;box-shadow:0 2px 10px rgba(0,0,0,0.3);';
+
+            const title = document.createElement('div');
+            title.style.cssText = 'font-weight:bold;margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid #2a3a4a;color:#00FA9A;font-size:12px;';
+            title.textContent = '图例';
+            div.appendChild(title);
+
+            const items = [
+                { color: '#2ecc71', label: '推荐停车点' },
+                { color: '#3498db', label: '手动选址点' },
+                { color: '#90EE90', label: '服务覆盖区' },
+                { color: '#e74c3c', label: '需求热力' }
+            ];
+
+            items.forEach(item => {
+                const row = document.createElement('div');
+                row.style.cssText = 'display:flex;align-items:center;margin:3px 0;';
+
+                const colorBox = document.createElement('span');
+                colorBox.style.cssText = `width:12px;height:12px;border-radius:2px;margin-right:6px;background-color:${item.color};`;
+
+                const label = document.createElement('span');
+                label.textContent = item.label;
+
+                row.appendChild(colorBox);
+                row.appendChild(label);
+                div.appendChild(row);
+            });
+
+            return div;
+        };
+        legendControl.addTo(this.map);
+
         this.map.on('click', (e) => this.emit('map:clicked', { latlng: e.latlng }));
         this.emit('ready', { status: 'ok' });
     },
@@ -209,7 +247,7 @@ const MapEngine = {
         if (!resp) return;
 
         if (resp.coverage_areas) {
-            L.geoJSON(resp.coverage_areas, { style: { color: '#3498db', weight: 2, opacity: 0.8, fillColor: '#3498db', fillOpacity: 0.15, className: 'siting-coverage-path' } }).addTo(this.layers.sitingCoverage);
+            L.geoJSON(resp.coverage_areas, { style: { color: '#2ecc71', weight: 2, opacity: 0.8, fillColor: '#90EE90', fillOpacity: 0.2, className: 'siting-coverage-path' } }).addTo(this.layers.sitingCoverage);
         }
         if (resp.optimal_sites) {
             L.geoJSON(resp.optimal_sites, {
@@ -217,10 +255,13 @@ const MapEngine = {
                 onEachFeature: (feature, layer) => {
                     const props = feature.properties;
                     layer.bindPopup(`<div class="siting-popup"><h4>推荐停车点</h4><p><b>编号:</b> ${props.site_id}</p><p><b>容量:</b> ${props.capacity}</p><p><b>服务人数:</b> ${props.served_people}</p></div>`);
-                    layer.on('click', () => this.emit('marker:clicked', { type: 'optimal', id: props.site_id }));
+                    layer.on('click', () => this.emit('marker:clicked', { type: 'optimal', id: props.site_id, data: props }));
                 }
             }).addTo(this.layers.sitingSites);
         }
+
+        this.layers.sitingSites.addTo(this.map);
+        this.layers.sitingCoverage.addTo(this.map);
 
         const bounds = this.getSitingBounds();
         if (bounds) this.map.flyToBounds(bounds, { padding: [50, 50], duration: 1.2 });
@@ -229,10 +270,33 @@ const MapEngine = {
     },
 
     setSitingEvaluateResponse(resp) {
-        this.layers.sitingCoverage.clearLayers();
+        this.layers.manualCoverage.clearLayers();
         if (resp?.coverage_areas) {
-            L.geoJSON(resp.coverage_areas, { style: { color: '#e67e22', weight: 2, dashArray: '5, 10', fillOpacity: 0.2 } }).addTo(this.layers.sitingCoverage);
-            this.map.flyToBounds(this.layers.sitingCoverage.getBounds(), { padding: [50, 50], duration: 1.2 });
+            L.geoJSON(resp.coverage_areas, { style: { color: '#3498db', weight: 2, dashArray: '5, 10', fillColor: '#ADD8E6', fillOpacity: 0.3 } }).addTo(this.layers.manualCoverage);
+        }
+        this.layers.manualCoverage.addTo(this.map);
+    },
+
+    addSitingData(resp) {
+        if (!resp) return;
+        if (resp.coverage_areas) {
+            L.geoJSON(resp.coverage_areas, { style: { color: '#2ecc71', weight: 2, opacity: 0.8, fillColor: '#90EE90', fillOpacity: 0.2, className: 'siting-coverage-path' } }).addTo(this.layers.sitingCoverage);
+        }
+        if (resp.optimal_sites) {
+            L.geoJSON(resp.optimal_sites, {
+                pointToLayer: (feature, latlng) => L.circleMarker(latlng, { radius: 8, fillColor: '#2ecc71', color: '#fff', weight: 2, fillOpacity: 0.9, className: 'siting-point-marker' }),
+                onEachFeature: (feature, layer) => {
+                    const props = feature.properties;
+                    layer.bindPopup(`<div class="siting-popup"><h4>推荐停车点</h4><p><b>编号:</b> ${props.site_id}</p><p><b>容量:</b> ${props.capacity}</p><p><b>服务人数:</b> ${props.served_people}</p></div>`);
+                    layer.on('click', () => this.emit('marker:clicked', { type: 'optimal', id: props.site_id, data: props }));
+                }
+            }).addTo(this.layers.sitingSites);
+        }
+    },
+
+    addManualCoverageData(resp) {
+        if (resp?.coverage_areas) {
+            L.geoJSON(resp.coverage_areas, { style: { color: '#3498db', weight: 2, dashArray: '5, 10', fillColor: '#ADD8E6', fillOpacity: 0.3 } }).addTo(this.layers.manualCoverage);
         }
     },
 
@@ -254,7 +318,7 @@ const MapEngine = {
         const customIcon = L.divIcon({ className: 'manual-site-marker', iconSize: [18, 18], iconAnchor: [9, 9] });
         const marker = L.marker([site.latitude, site.longitude], { icon: customIcon, draggable: true });
         marker.siteData = { site_id, name: site.name || '自定义点位', capacity: site.capacity || 30, latitude: site.latitude, longitude: site.longitude };
-        
+
         marker.on('dragend', (e) => {
             const newPos = e.target.getLatLng();
             marker.siteData.latitude = newPos.lat;
@@ -263,6 +327,9 @@ const MapEngine = {
         });
         marker.on('click', () => this.emit("manualSite:clicked", marker.siteData));
         marker.addTo(this.layers.manualSites);
+        if (!this.map.hasLayer(this.layers.manualSites)) {
+            this.layers.manualSites.addTo(this.map);
+        }
         return site_id;
     },
 
@@ -463,11 +530,20 @@ const MapEngine = {
     // 6. 统一清理方法集
     // ==========================================
     clearSiting() {
+        if (this.map.hasLayer(this.layers.sitingSites)) this.map.removeLayer(this.layers.sitingSites);
+        if (this.map.hasLayer(this.layers.sitingCoverage)) this.map.removeLayer(this.layers.sitingCoverage);
         this.layers.sitingSites.clearLayers();
         this.layers.sitingCoverage.clearLayers();
     },
-    clearManualSites() { 
-        this.layers.manualSites.clearLayers(); 
+    clearManualSites() {
+        if (this.map.hasLayer(this.layers.manualSites)) this.map.removeLayer(this.layers.manualSites);
+        if (this.map.hasLayer(this.layers.manualCoverage)) this.map.removeLayer(this.layers.manualCoverage);
+        this.layers.manualSites.clearLayers();
+        this.layers.manualCoverage.clearLayers();
+    },
+    clearManualCoverage() {
+        if (this.map.hasLayer(this.layers.manualCoverage)) this.map.removeLayer(this.layers.manualCoverage);
+        this.layers.manualCoverage.clearLayers();
     },
     clearDispatch() {
         this.stopDispatchAnimation(); 
