@@ -4,7 +4,11 @@ from fastapi import APIRouter, HTTPException, Query
 
 from app.algorithm.dispatch_routing import build_site_status, run_dispatch_routing
 from app.schemas.common import PeriodEnum
-from app.schemas.dispatch import DispatchOptimizeRequest, DispatchOptimizeResponse, DispatchStatusResponse
+from app.schemas.dispatch import (
+    DispatchOptimizeRequest,
+    DispatchOptimizeResponse,
+    DispatchStatusResponse,
+)
 
 router = APIRouter()
 
@@ -45,6 +49,7 @@ def optimize_dispatch(payload: DispatchOptimizeRequest) -> DispatchOptimizeRespo
             period=period_value,
             algorithm_type=payload.algorithm_type,
             include_process=payload.include_process,
+            current_sites=payload.current_sites,
         )
         return DispatchOptimizeResponse(**result)
     except Exception as e:

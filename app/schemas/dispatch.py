@@ -22,19 +22,29 @@ class DispatchStatusResponse(BaseModel):
     stations: list[DispatchStatusItem] = Field(default_factory=list)
 
 
+class DispatchSiteInput(BaseModel):
+    site_id: str | None = None
+    name: str | None = None
+    latitude: float
+    longitude: float
+    capacity: int = Field(default=0, ge=0)
+
+
 class DispatchOptimizeRequest(BaseModel):
     period: PeriodEnum
-    algorithm_type: str = Field(default="ACO")
+    algorithm_type: str = Field(default="GA")
     include_process: bool = Field(
         default=False,
         description="Whether to reserve and return algorithm process visualization metadata. / 是否返回算法过程可视化所需的运行信息。",
     )
+    current_sites: list[DispatchSiteInput] = Field(default_factory=list)
 
 
 class DispatchOptimizeResponse(BaseModel):
     status: str = "mock"
     period: str
     algorithm_type: str
+    stations: list[dict[str, Any]] = Field(default_factory=list)
     dispatch_routes: dict[str, Any]
     transfer_plan: list[dict[str, Any]] = Field(default_factory=list)
     efficiency_metrics: dict[str, Any]

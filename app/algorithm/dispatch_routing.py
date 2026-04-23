@@ -1,5 +1,10 @@
 ﻿from __future__ import annotations
 
+import heapq
+import json
+from functools import lru_cache
+from pathlib import Path
+
 from app.algorithm.candidate_site_generator import build_candidate_sites
 from app.algorithm.demand_prediction import build_demand_points
 from app.algorithm.siting_optimization import (
@@ -12,19 +17,42 @@ DEFAULT_SITE_COUNT = 12
 DEFAULT_SERVICE_RADIUS = 120.0
 DEFAULT_UNIT_COST_PER_METER = 0.02
 
-#GA参数
+# GA 参数
 GA_POPULATION_SIZE = 40
 GA_GENERATIONS = 80
 GA_MUTATION_RATE = 0.15
 GA_ELITE_SIZE = 4
 UNMET_PENALTY_PER_BIKE = 50.0
 
+
+def normalize_dispatch_sites(current_sites: list) -> list[dict]:
+    normalized = []
+
+    for idx, site in enumerate(current_sites, start=1):
+        if hasattr(site, "model_dump"):
+            raw = site.model_dump()
+        elif hasattr(site, "dict"):
+            raw = site.dict()
+        else:
+            raw = dict(site)
+
+        normalized.append({
+            "site_id": raw.get("site_id") or f"dispatch_manual_{idx}",
+            "name": raw.get("name") or f"dispatch_manual_site_{idx}",
+            "type": "manual",
+            "x": raw["longitude"],
+            "y": raw["latitude"],
+            "capacity": raw.get("capacity", 0),
+        })
+
+    return normalized
+
+
 def _select_reference_sites(period: str, site_count: int = DEFAULT_SITE_COUNT) -> list[dict]:
     """
-    第一版调度的站点来源：
+    默认调度站点来源：
     直接从候选站点中，按对应需求点在指定时段的需求强度排序，
     选出前 N 个站点作为“已建设停车点”。
-    这是过渡方案，后面可以改成直接读取选址结果。
     """
     demand_points = build_demand_points()
     candidate_sites = build_candidate_sites()
@@ -42,19 +70,22 @@ def _select_reference_sites(period: str, site_count: int = DEFAULT_SITE_COUNT) -
     return [item[0] for item in scored_sites[:site_count]]
 
 
-def build_site_status(period: str, site_count: int = DEFAULT_SITE_COUNT) -> list[dict]:
+def build_site_status(period: str, site_count: int = DEFAULT_SITE_COUNT, current_sites: list | None = None) -> list[dict]:
     """
     生成某个时段的站点供需状态。
-    第一版策略：
-    - 站点集合：取需求最高的前 N 个候选点
-    - 需求：从 demand_points 中按最近站点聚合
-    - 当前车量：基于预测需求做一个偏移，制造“有的缺车、有的余车”的状态
+    支持两种站点来源：
+    - 未传 current_sites：用默认参考站点
+    - 传了 current_sites：直接用外部方案站点（人工选址或智能选址）
     """
     if period not in {"morning", "noon", "evening"}:
         raise ValueError("period 必须为 morning / noon / evening")
 
     demand_points = build_demand_points()
-    selected_sites = _select_reference_sites(period=period, site_count=site_count)
+
+    if current_sites:
+        selected_sites = normalize_dispatch_sites(current_sites)
+    else:
+        selected_sites = _select_reference_sites(period=period, site_count=site_count)
 
     distance_matrix = build_distance_matrix(demand_points, selected_sites)
 
@@ -62,14 +93,15 @@ def build_site_status(period: str, site_count: int = DEFAULT_SITE_COUNT) -> list
     for idx, site in enumerate(selected_sites):
         site_status.append({
             "site_id": site["site_id"],
-            "site_name": site["name"],
+            "site_name": site.get("name", site.get("site_name", f"site_{idx+1}")),
             "x": site["x"],
             "y": site["y"],
-            "type": site["type"],
+            "type": site.get("type", "manual"),
             "predicted_demand": 0,
             "current_bikes": 0,
             "inbound": 0,
             "outbound": 0,
+            "capacity": site.get("capacity", 0),
         })
 
     site_index = {s["site_id"]: s for s in site_status}
@@ -86,13 +118,16 @@ def build_site_status(period: str, site_count: int = DEFAULT_SITE_COUNT) -> list
     for idx, site in enumerate(site_status):
         demand = site["predicted_demand"]
 
-        # 用固定规则制造早期可调度状态，避免全平衡
         if idx % 3 == 0:
             current_bikes = int(round(demand * 1.25))   # 余车点
         elif idx % 3 == 1:
             current_bikes = int(round(demand * 0.75))   # 缺车点
         else:
             current_bikes = int(round(demand * 0.95))   # 轻微缺/近平衡
+
+        # 如果外部传入 capacity，则优先至少保留一个与 capacity 相关的量级参考
+        if site.get("capacity", 0) > 0:
+            current_bikes = max(current_bikes, int(round(site["capacity"] * 0.8)))
 
         site["current_bikes"] = max(current_bikes, 0)
 
@@ -126,7 +161,7 @@ def _decode_dispatch_order(
 ) -> tuple[list[dict], dict]:
     """
     根据“缺车点处理顺序”解码出完整调度方案。
-    这是 GA 的核心解码器。
+    当前评价仍用直线距离；地图显示单独走路网最短路。
     """
     working_surplus = [
         {**s, "surplus": int(s["surplus"])}
@@ -145,7 +180,6 @@ def _decode_dispatch_order(
         while need > 0 and any(s["surplus"] > 0 for s in working_surplus):
             available_surplus = [s for s in working_surplus if s["surplus"] > 0]
 
-            # 这里不是纯最近邻，而是让解码器在当前状态下动态选择
             chosen = min(
                 available_surplus,
                 key=lambda s: haversine_distance(
@@ -330,11 +364,6 @@ def _run_dispatch_genetic_algorithm(surplus_sites: list[dict], deficit_sites: li
 
 
 def _match_supply_and_demand(stations: list[dict]) -> tuple[list[dict], dict, list[dict]]:
-    """
-    GA 版调度优化：
-    - 染色体：缺车点处理顺序
-    - 解码：按顺序从余车点分配车辆
-    """
     surplus_sites, deficit_sites = _prepare_supply_and_deficit(stations)
 
     ga_result = _run_dispatch_genetic_algorithm(
@@ -353,6 +382,129 @@ def _match_supply_and_demand(stations: list[dict]) -> tuple[list[dict], dict, li
     return transfer_plan, metrics, ga_result["iterations"]
 
 
+def _node_key(lng: float, lat: float, ndigits: int = 7) -> tuple[float, float]:
+    return (round(lng, ndigits), round(lat, ndigits))
+
+
+@lru_cache(maxsize=1)
+def _load_road_graph() -> tuple[dict, list[tuple[float, float]]]:
+    project_root = Path(__file__).resolve().parents[2]
+    roads_path = project_root / "whu_spatial_data" / "whu_roads.geojson"
+
+    with open(roads_path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+
+    graph: dict[tuple[float, float], list[tuple[tuple[float, float], float]]] = {}
+
+    for feat in data.get("features", []):
+        geom = feat.get("geometry", {})
+        if geom.get("type") != "LineString":
+            continue
+
+        coords = geom.get("coordinates", [])
+        if len(coords) < 2:
+            continue
+
+        props = feat.get("properties", {})
+        oneway = str(props.get("oneway", "")).lower() in {"yes", "1", "true"}
+
+        for i in range(len(coords) - 1):
+            a = _node_key(coords[i][0], coords[i][1])
+            b = _node_key(coords[i + 1][0], coords[i + 1][1])
+
+            dist = haversine_distance(a[0], a[1], b[0], b[1])
+
+            graph.setdefault(a, []).append((b, dist))
+            if not oneway:
+                graph.setdefault(b, []).append((a, dist))
+
+    nodes = list(graph.keys())
+    return graph, nodes
+
+
+def _find_nearest_graph_node(lng: float, lat: float, nodes: list[tuple[float, float]]) -> tuple[float, float]:
+    best_node = None
+    best_dist = float("inf")
+
+    for node in nodes:
+        d = haversine_distance(lng, lat, node[0], node[1])
+        if d < best_dist:
+            best_dist = d
+            best_node = node
+
+    return best_node
+
+
+def _dijkstra_path(
+    graph: dict,
+    start: tuple[float, float],
+    end: tuple[float, float],
+) -> list[tuple[float, float]]:
+    pq = [(0.0, start)]
+    dist = {start: 0.0}
+    prev = {start: None}
+    visited = set()
+
+    while pq:
+        cur_dist, u = heapq.heappop(pq)
+        if u in visited:
+            continue
+        visited.add(u)
+
+        if u == end:
+            break
+
+        for v, w in graph.get(u, []):
+            nd = cur_dist + w
+            if nd < dist.get(v, float("inf")):
+                dist[v] = nd
+                prev[v] = u
+                heapq.heappush(pq, (nd, v))
+
+    if end not in prev:
+        return []
+
+    path = []
+    cur = end
+    while cur is not None:
+        path.append(cur)
+        cur = prev[cur]
+    path.reverse()
+    return path
+
+
+def _build_road_following_route(
+    from_lng: float,
+    from_lat: float,
+    to_lng: float,
+    to_lat: float,
+) -> tuple[list[list[float]], float]:
+    graph, nodes = _load_road_graph()
+
+    start_node = _find_nearest_graph_node(from_lng, from_lat, nodes)
+    end_node = _find_nearest_graph_node(to_lng, to_lat, nodes)
+
+    path = _dijkstra_path(graph, start_node, end_node)
+
+    if not path:
+        coords = [[from_lng, from_lat], [to_lng, to_lat]]
+        dist = haversine_distance(from_lng, from_lat, to_lng, to_lat)
+        return coords, round(dist, 2)
+
+    coords = [[from_lng, from_lat]]
+    coords.extend([[lng, lat] for lng, lat in path])
+    coords.append([to_lng, to_lat])
+
+    total_dist = 0.0
+    for i in range(len(coords) - 1):
+        total_dist += haversine_distance(
+            coords[i][0], coords[i][1],
+            coords[i + 1][0], coords[i + 1][1]
+        )
+
+    return coords, round(total_dist, 2)
+
+
 def _build_dispatch_routes(transfer_plan: list[dict], stations: list[dict]) -> dict:
     station_map = {s["site_id"]: s for s in stations}
 
@@ -361,26 +513,27 @@ def _build_dispatch_routes(transfer_plan: list[dict], stations: list[dict]) -> d
         from_site = station_map[item["from_site_id"]]
         to_site = station_map[item["to_site_id"]]
 
+        route_coords, route_dist = _build_road_following_route(
+            from_lng=from_site["x"],
+            from_lat=from_site["y"],
+            to_lng=to_site["x"],
+            to_lat=to_site["y"],
+        )
+
         vehicle_id = f"vehicle_{idx}"
 
         features.append({
             "type": "Feature",
             "geometry": {
                 "type": "LineString",
-                "coordinates": [
-                    [from_site["x"], from_site["y"]],
-                    [to_site["x"], to_site["y"]],
-                ],
+                "coordinates": route_coords,
             },
             "properties": {
-                # 原有字段，继续保留
                 "route_id": f"route_{idx}",
                 "from_site_id": item["from_site_id"],
                 "to_site_id": item["to_site_id"],
                 "bikes": item["bikes"],
-                "distance": item["distance"],
-
-                # 给成员 C / webmap 用的兼容字段
+                "distance": route_dist,
                 "vehicle_id": vehicle_id,
                 "from_site": item["from_site_name"],
                 "to_site": item["to_site_name"],
@@ -442,11 +595,18 @@ def build_dispatch_process_states(result: dict) -> list[dict]:
     ]
 
 
-def run_dispatch_routing(period, algorithm_type: str, include_process: bool = False) -> dict:
+def run_dispatch_routing(
+    period,
+    algorithm_type: str,
+    include_process: bool = False,
+    current_sites: list | None = None,
+) -> dict:
     """
-    第一版统一入口：
-    - 当前先接受 ACO / GA 名义参数
-    - 实际统一走“最近邻余缺匹配”逻辑
+    当前正式实现：
+    - 仅支持 GA
+    - 调度优化主体：GA 搜索缺车点处理顺序
+    - 路线几何：沿 whu_roads.geojson 路网最短路生成
+    - 若传入 current_sites，则基于外部方案站点生成调度方案
     """
     period = str(period)
     algorithm_type = str(algorithm_type).upper()
@@ -457,11 +617,14 @@ def run_dispatch_routing(period, algorithm_type: str, include_process: bool = Fa
     if algorithm_type != "GA":
         raise ValueError("当前正式实现仅支持 GA，ACO 暂未实现")
 
-    stations = build_site_status(period=period, site_count=12)
+    stations = build_site_status(
+        period=period,
+        site_count=12,
+        current_sites=current_sites,
+    )
     transfer_plan, efficiency_metrics, iterations = _match_supply_and_demand(stations)
     dispatch_routes = _build_dispatch_routes(transfer_plan, stations)
 
-    # 回填站点 inbound / outbound
     station_map = {s["site_id"]: s for s in stations}
     for item in transfer_plan:
         station_map[item["from_site_id"]]["outbound"] += item["bikes"]
