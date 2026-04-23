@@ -19,6 +19,71 @@
             border-radius: 50%;
             box-shadow: 0 0 8px rgba(52, 152, 219, 0.8);
         }
+        .student-sim-hud {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            z-index: 1200;
+            pointer-events: none;
+            background: rgba(11, 18, 32, 0.72);
+            border: 1px solid rgba(42, 58, 74, 0.9);
+            border-radius: 10px;
+            padding: 10px 12px;
+            min-width: 180px;
+            backdrop-filter: blur(8px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+        }
+        .student-sim-hud .title {
+            font-size: 12px;
+            font-weight: 700;
+            color: #00E5FF;
+            margin-bottom: 6px;
+            letter-spacing: 0.5px;
+        }
+        .student-sim-hud .row {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            font-size: 12px;
+            color: #cbd5e1;
+            line-height: 1.5;
+        }
+        .student-sim-hud .muted { color: #94a3b8; }
+        .student-route {
+            filter: drop-shadow(0 0 6px rgba(0, 229, 255, 0.35));
+            mix-blend-mode: screen;
+        }
+        .student-dot {
+            filter: drop-shadow(0 0 8px rgba(0, 250, 154, 0.55));
+        }
+        .dispatch-vehicle-marker {
+            width: 16px;
+            height: 16px;
+        }
+        .dispatch-vehicle-marker > div {
+            width: 14px;
+            height: 14px;
+            margin: 1px;
+            border-radius: 50%;
+            border: 2px solid rgba(226, 232, 240, 0.9);
+            box-shadow: 0 0 10px rgba(0, 229, 255, 0.35), 0 0 18px rgba(0, 250, 154, 0.25);
+        }
+        .sim-row { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; }
+        .sim-row:last-child { margin-bottom: 0; }
+        .sim-label { width: 86px; font-size: 12px; color: #94a3b8; }
+        .sim-input, .sim-select {
+            flex: 1;
+            padding: 8px 10px;
+            border-radius: 8px;
+            border: 1px solid #2a3a4a;
+            background: #0b1220;
+            color: #e0e0e0;
+            font-size: 13px;
+            outline: none;
+        }
+        .sim-hint { font-size: 11px; color: #6a7a8a; margin-top: 6px; }
+        .btn-tertiary { background: #182535; color: #e0e0e0; }
+        .btn-tertiary:hover { background: #223549; }
 
         .dashboard-container { display: flex; width: 100%; height: 100vh; }
 
@@ -255,6 +320,13 @@
                         <span class="toggle-slider"></span>
                     </label>
                 </div>
+                <div class="layer-item">
+                    <span>学生轨迹</span>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="layerStudentSim">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
             </div>
 
             <div class="panel-section">
@@ -272,6 +344,33 @@
             </div>
 
             <div class="panel-section">
+                <div class="section-title">👥 人流模拟</div>
+                <div class="sim-row">
+                    <div class="sim-label">学生数量</div>
+                    <input class="sim-input" id="studentSimCount" type="number" min="1" max="500" step="1" value="30">
+                </div>
+                <div class="sim-row">
+                    <div class="sim-label">渲染上限</div>
+                    <input class="sim-input" id="studentSimRenderLimit" type="number" min="1" max="200" step="1" value="40">
+                </div>
+                <div class="sim-row">
+                    <div class="sim-label">速度(分/秒)</div>
+                    <input class="sim-input" id="studentSimSpeed" type="number" min="1" max="180" step="1" value="20">
+                </div>
+                <div class="sim-row" style="justify-content: space-between;">
+                    <label style="display:flex; align-items:center; gap:8px; font-size:12px; color:#cbd5e1;">
+                        <input type="checkbox" id="studentSimIncludeRoutes" checked>
+                        生成沿路网轨迹
+                    </label>
+                    <div id="studentSimStatus" style="font-size:11px; color:#6a7a8a;">未生成</div>
+                </div>
+                <button class="action-btn btn-primary" id="btnStudentSimGenerate">👥 生成轨迹</button>
+                <button class="action-btn btn-tertiary" id="btnStudentSimPlay">⏵ 播放</button>
+                <button class="action-btn btn-danger" id="btnStudentSimClear">🗑️ 清空轨迹</button>
+                <div class="sim-hint">提示：先点击“生成轨迹”，再开启“学生轨迹”图层开关并播放。</div>
+            </div>
+
+            <div class="panel-section">
                 <div class="section-title">💾 方案管理</div>
                 <button class="action-btn btn-primary" id="btnSaveScheme">💾 保存当前方案</button>
                 <button class="action-btn btn-secondary" id="btnExportScheme">📤 导出方案</button>
@@ -282,6 +381,12 @@
 
         <div class="map-wrapper">
             <div id="map"></div>
+            <div class="student-sim-hud" id="studentSimHud" style="display:none;">
+                <div class="title">👥 人流模拟</div>
+                <div class="row"><span class="muted">模拟时间</span><span id="studentSimHudTime">--:--</span></div>
+                <div class="row"><span class="muted">渲染人数</span><span id="studentSimHudCount">--</span></div>
+                <div class="row"><span class="muted">播放速度</span><span id="studentSimHudSpeed">--</span></div>
+            </div>
             <div class="compare-panel" id="comparePanel">
                 <div class="compare-title">📊 方案对比 (选择2个方案)</div>
                 <div class="compare-btns" id="compareBtns"></div>
@@ -391,15 +496,26 @@
         let manualSitingMode = false;
         let campusLayers = { buildings: null, roads: null, pois: null };
         let heatmapOptions = {
-            radius: 40,
-            blur: 20,
-            maxOpacity: 0.9,
-            minOpacity: 0.3,
-            gradient: { 0.2: '#22d3ee', 0.4: '#67e8f9', 0.6: '#fcd34d', 0.8: '#f97316', 1.0: '#ef4444' }
+            radius: 28,
+            blur: 18,
+            maxOpacity: 0.75,
+            minOpacity: 0.12,
+            max: 1.0,
+            gradient: { 0.15: '#22d3ee', 0.45: '#67e8f9', 0.70: '#fcd34d', 0.88: '#fb7185', 1.0: '#ef4444' }
         };
+        let studentSimResp = null;
+        let studentSimIndex = null;
+        let studentSimLayers = null;
+        let studentSimRaf = null;
+        let studentSimPlaying = false;
+        let studentSimSimMinute = 0;
+        let studentSimSimStart = 8 * 60;
+        let studentSimSimEnd = 20 * 60;
+        let studentSimLastTs = 0;
 
         document.addEventListener('DOMContentLoaded', () => {
             MapEngine.init('map', { basemap: 'cartoDark' });
+            initStudentSim();
             initCharts();
             loadSchemes();
             loadBaseData();
@@ -576,7 +692,24 @@
                         if (currentHeatLayer) {
                             MapEngine.map.removeLayer(currentHeatLayer);
                         }
-                        currentHeatLayer = L.heatLayer(data.points, heatmapOptions).addTo(MapEngine.map);
+                        // 后端权重是 predicted_demand（可能是 100~700 这种数值），leaflet-heat 默认 max=1 会导致“全图红”
+                        // 这里把权重归一化到 0~1，让高需求才会红、低需求保持浅色形成对比
+                        const rawPoints = data.points;
+                        const weights = rawPoints
+                            .map(p => (Array.isArray(p) && typeof p[2] === 'number') ? p[2] : 1)
+                            .filter(w => Number.isFinite(w));
+                        const wMin = weights.length ? Math.min(...weights) : 0;
+                        const wMax = weights.length ? Math.max(...weights) : 1;
+                        const denom = (wMax - wMin) || 1;
+                        const gamma = 0.65;
+                        const normalized = rawPoints.map(p => {
+                            const lat = p[0], lng = p[1];
+                            const w = (typeof p[2] === 'number' && Number.isFinite(p[2])) ? p[2] : 1;
+                            const t = Math.max(0, Math.min(1, (w - wMin) / denom));
+                            const intensity = 0.10 + 0.90 * Math.pow(t, gamma);
+                            return [lat, lng, intensity];
+                        });
+                        currentHeatLayer = L.heatLayer(normalized, heatmapOptions).addTo(MapEngine.map);
                     }
                 })
                 .catch(err => console.error('Failed to load heatmap:', err));
@@ -648,14 +781,29 @@
                     MapEngine.map.removeLayer(MapEngine.layers.manualCoverage);
                 }
             });
-            document.getElementById('layerDispatch').addEventListener('change', e => toggleLayer('dispatchRoutes', e.target.checked));
+            document.getElementById('layerDispatch').addEventListener('change', e => {
+                toggleLayer('dispatchRoutes', e.target.checked);
+                toggleLayer('dispatchVehicles', e.target.checked);
+                if (!e.target.checked && MapEngine.stopDispatchAnimation) MapEngine.stopDispatchAnimation();
+            });
+            document.getElementById('layerStudentSim').addEventListener('change', e => toggleStudentSimLayer(e.target.checked));
 
             document.getElementById('btnSitingOptimize').addEventListener('click', runSitingOptimize);
             document.getElementById('btnManualSiting').addEventListener('click', toggleManualSitingMode);
             document.getElementById('btnClearSiting').addEventListener('click', () => { MapEngine.clearSiting(); MapEngine.clearManualSites(); sitingResult = null; refreshAll(); showToast('选址已清除', 'success'); });
             document.getElementById('btnDispatchOptimize').addEventListener('click', runDispatchOptimize);
-            document.getElementById('btnPlayDispatch').addEventListener('click', () => { if (dispatchResult) MapEngine.playDispatchAnimation({ duration: 8000 }); else showToast('请先运行调度优化', 'error'); });
+            document.getElementById('btnPlayDispatch').addEventListener('click', () => {
+                const hasRoutes = (MapEngine.layers?.dispatchRoutes?.getLayers?.() || []).length > 0;
+                if (!hasRoutes) { showToast('请先运行调度优化', 'error'); return; }
+                document.getElementById('layerDispatch').checked = true;
+                toggleLayer('dispatchRoutes', true);
+                toggleLayer('dispatchVehicles', true);
+                MapEngine.playDispatchAnimation({ duration: 8000 });
+            });
             document.getElementById('btnClearDispatch').addEventListener('click', () => { MapEngine.clearDispatch(); dispatchResult = null; refreshAll(); showToast('调度已清除', 'success'); });
+            document.getElementById('btnStudentSimGenerate').addEventListener('click', runStudentSimGenerate);
+            document.getElementById('btnStudentSimPlay').addEventListener('click', toggleStudentSimPlay);
+            document.getElementById('btnStudentSimClear').addEventListener('click', clearStudentSim);
             document.getElementById('btnLoadSupplyDemand').addEventListener('click', loadSupplyDemand);
 
             document.getElementById('btnSaveScheme').addEventListener('click', () => { document.getElementById('saveSchemeModal').classList.add('active'); });
@@ -677,6 +825,277 @@
                 if (visible) MapEngine.layers[layerName].addTo(MapEngine.map);
                 else MapEngine.map.removeLayer(MapEngine.layers[layerName]);
             }
+        }
+
+        function initStudentSim() {
+            if (!MapEngine?.map) return;
+            if (!MapEngine.map.getPane('studentSimPane')) {
+                MapEngine.map.createPane('studentSimPane');
+            }
+            const pane = MapEngine.map.getPane('studentSimPane');
+            pane.style.zIndex = '650';
+            pane.style.pointerEvents = 'none';
+
+            studentSimLayers = {
+                routes: L.layerGroup(),
+                markers: L.layerGroup()
+            };
+
+            const visible = document.getElementById('layerStudentSim')?.checked;
+            if (visible) {
+                studentSimLayers.routes.addTo(MapEngine.map);
+                studentSimLayers.markers.addTo(MapEngine.map);
+                document.getElementById('studentSimHud').style.display = '';
+            }
+            updateStudentSimHud();
+        }
+
+        function toggleStudentSimLayer(visible) {
+            if (!studentSimLayers) initStudentSim();
+            if (!studentSimLayers) return;
+            if (visible) {
+                studentSimLayers.routes.addTo(MapEngine.map);
+                studentSimLayers.markers.addTo(MapEngine.map);
+                document.getElementById('studentSimHud').style.display = '';
+                if (!studentSimResp) showToast('请先生成学生轨迹', 'success');
+            } else {
+                stopStudentSim();
+                MapEngine.map.removeLayer(studentSimLayers.routes);
+                MapEngine.map.removeLayer(studentSimLayers.markers);
+                document.getElementById('studentSimHud').style.display = 'none';
+            }
+        }
+
+        function clearStudentSim() {
+            stopStudentSim();
+            studentSimResp = null;
+            studentSimIndex = null;
+            if (studentSimLayers) {
+                studentSimLayers.routes.clearLayers();
+                studentSimLayers.markers.clearLayers();
+            }
+            const statusEl = document.getElementById('studentSimStatus');
+            if (statusEl) statusEl.textContent = '未生成';
+            updateStudentSimHud();
+        }
+
+        async function runStudentSimGenerate() {
+            const count = Math.max(1, parseInt(document.getElementById('studentSimCount')?.value || '30', 10));
+            const includeRoutes = !!document.getElementById('studentSimIncludeRoutes')?.checked;
+            const renderLimit = Math.max(1, parseInt(document.getElementById('studentSimRenderLimit')?.value || '40', 10));
+            showToast('正在生成人流轨迹...', 'success');
+            try {
+                const resp = await fetch(`${apiBaseUrl}/simulation/students/day`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ student_count: count, include_routes: includeRoutes })
+                });
+                const data = await resp.json();
+                if (!data || data.status === 'error') throw new Error(data?.message || '服务返回错误');
+                studentSimResp = data;
+                studentSimIndex = buildStudentSimIndex(data, renderLimit);
+                renderStudentSim(studentSimIndex);
+                document.getElementById('layerStudentSim').checked = true;
+                toggleStudentSimLayer(true);
+                document.getElementById('studentSimStatus').textContent = `已生成：${studentSimIndex.renderedCount}/${data.student_count}`;
+                showToast('人流轨迹生成完成', 'success');
+            } catch (err) {
+                console.error(err);
+                showToast('生成人流轨迹失败：' + err.message, 'error');
+            }
+        }
+
+        function parseClockToMinute(clockStr) {
+            if (!clockStr || typeof clockStr !== 'string') return null;
+            const m = clockStr.trim().match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+            if (!m) return null;
+            const hh = parseInt(m[1], 10);
+            const mm = parseInt(m[2], 10);
+            return hh * 60 + mm;
+        }
+
+        function buildStudentSimIndex(resp, renderLimit) {
+            const students = Array.isArray(resp?.students) ? resp.students : [];
+            const renderedStudents = students.slice(0, Math.max(1, renderLimit));
+
+            const markersById = new Map();
+            const studentsIndex = renderedStudents.map(s => {
+                const segments = Array.isArray(s?.segments) ? s.segments : [];
+                const processed = segments
+                    .map(seg => {
+                        const startM = parseClockToMinute(seg.start_time) ?? null;
+                        const endM = parseClockToMinute(seg.end_time) ?? null;
+                        const coords = Array.isArray(seg.route_coords) ? seg.route_coords : [];
+                        const latlngs = coords
+                            .filter(p => Array.isArray(p) && p.length >= 2)
+                            .map(([lng, lat]) => [lat, lng]);
+                        return { startM, endM, latlngs, activity_type: seg.activity_type };
+                    })
+                    .filter(seg => seg.latlngs.length >= 2 && seg.startM !== null && seg.endM !== null && seg.endM > seg.startM);
+                return {
+                    student_id: s.student_id,
+                    student_type: s.student_type,
+                    segments: processed
+                };
+            }).filter(s => s.segments.length > 0);
+
+            let minT = Infinity;
+            let maxT = -Infinity;
+            for (const s of studentsIndex) {
+                for (const seg of s.segments) {
+                    minT = Math.min(minT, seg.startM);
+                    maxT = Math.max(maxT, seg.endM);
+                }
+            }
+            if (!Number.isFinite(minT) || !Number.isFinite(maxT) || minT >= maxT) {
+                minT = 8 * 60;
+                maxT = 20 * 60;
+            }
+            studentSimSimStart = minT;
+            studentSimSimEnd = maxT;
+            studentSimSimMinute = minT;
+
+            return {
+                students: studentsIndex,
+                markersById,
+                renderedCount: studentsIndex.length
+            };
+        }
+
+        function studentTypeColor(studentType) {
+            if (studentType === 'engineering') return '#00E5FF';
+            if (studentType === 'information') return '#00FA9A';
+            if (studentType === 'literature_science') return '#A78BFA';
+            return '#FCD34D';
+        }
+
+        function renderStudentSim(index) {
+            if (!studentSimLayers) initStudentSim();
+            if (!studentSimLayers) return;
+            studentSimLayers.routes.clearLayers();
+            studentSimLayers.markers.clearLayers();
+            index.markersById.clear();
+
+            for (const s of index.students) {
+                const color = studentTypeColor(s.student_type);
+                for (const seg of s.segments) {
+                    const line = L.polyline(seg.latlngs, {
+                        pane: 'studentSimPane',
+                        color,
+                        weight: 2,
+                        opacity: 0.28,
+                        className: 'student-route'
+                    });
+                    studentSimLayers.routes.addLayer(line);
+                }
+                const first = s.segments[0]?.latlngs?.[0];
+                if (first) {
+                    const dot = L.circleMarker(first, {
+                        pane: 'studentSimPane',
+                        radius: 4,
+                        color: '#E2E8F0',
+                        weight: 1,
+                        fillColor: color,
+                        fillOpacity: 0.95,
+                        className: 'student-dot'
+                    });
+                    studentSimLayers.markers.addLayer(dot);
+                    index.markersById.set(s.student_id, dot);
+                }
+            }
+            updateStudentSimHud();
+        }
+
+        function formatMinute(minuteOfDay) {
+            const m = Math.max(0, Math.round(minuteOfDay));
+            const hh = String(Math.floor(m / 60) % 24).padStart(2, '0');
+            const mm = String(m % 60).padStart(2, '0');
+            return `${hh}:${mm}`;
+        }
+
+        function updateStudentSimHud() {
+            const hud = document.getElementById('studentSimHud');
+            if (!hud) return;
+            const visible = document.getElementById('layerStudentSim')?.checked;
+            if (!visible) return;
+            const speed = Math.max(1, parseInt(document.getElementById('studentSimSpeed')?.value || '20', 10));
+            document.getElementById('studentSimHudTime').textContent = formatMinute(studentSimSimMinute || studentSimSimStart);
+            document.getElementById('studentSimHudCount').textContent = String(studentSimIndex?.renderedCount ?? 0);
+            document.getElementById('studentSimHudSpeed').textContent = `${speed} 分/秒`;
+        }
+
+        function toggleStudentSimPlay() {
+            if (!studentSimResp || !studentSimIndex || (studentSimIndex?.renderedCount ?? 0) === 0) {
+                showToast('请先生成学生轨迹', 'error');
+                return;
+            }
+            if (!document.getElementById('layerStudentSim')?.checked) {
+                document.getElementById('layerStudentSim').checked = true;
+                toggleStudentSimLayer(true);
+            }
+            if (studentSimPlaying) stopStudentSim();
+            else playStudentSim();
+        }
+
+        function playStudentSim() {
+            if (studentSimPlaying) return;
+            studentSimPlaying = true;
+            studentSimLastTs = 0;
+            document.getElementById('btnStudentSimPlay').textContent = '⏸ 暂停';
+            document.getElementById('studentSimHud').style.display = '';
+            studentSimRaf = requestAnimationFrame(studentSimTick);
+        }
+
+        function stopStudentSim() {
+            studentSimPlaying = false;
+            if (studentSimRaf) cancelAnimationFrame(studentSimRaf);
+            studentSimRaf = null;
+            const btn = document.getElementById('btnStudentSimPlay');
+            if (btn) btn.textContent = '⏵ 播放';
+        }
+
+        function interpLatLng(latlngs, t01) {
+            if (!latlngs || latlngs.length === 0) return null;
+            if (latlngs.length === 1) return latlngs[0];
+            const tt = Math.min(1, Math.max(0, t01));
+            const f = tt * (latlngs.length - 1);
+            const i = Math.floor(f);
+            const frac = f - i;
+            const a = latlngs[i];
+            const b = latlngs[Math.min(i + 1, latlngs.length - 1)];
+            return [a[0] + (b[0] - a[0]) * frac, a[1] + (b[1] - a[1]) * frac];
+        }
+
+        function findActiveSegment(segments, minuteOfDay) {
+            for (const seg of segments) {
+                if (minuteOfDay >= seg.startM && minuteOfDay < seg.endM) return seg;
+            }
+            if (minuteOfDay < segments[0].startM) return segments[0];
+            return segments[segments.length - 1];
+        }
+
+        function studentSimTick(ts) {
+            if (!studentSimPlaying) return;
+            const speed = Math.max(1, parseInt(document.getElementById('studentSimSpeed')?.value || '20', 10)); // minutes per second
+            if (!studentSimLastTs) studentSimLastTs = ts;
+            const dt = Math.min(0.05, (ts - studentSimLastTs) / 1000);
+            studentSimLastTs = ts;
+
+            studentSimSimMinute += dt * speed;
+            if (studentSimSimMinute > studentSimSimEnd) studentSimSimMinute = studentSimSimStart;
+
+            if (studentSimIndex?.students && studentSimIndex?.markersById) {
+                for (const s of studentSimIndex.students) {
+                    const marker = studentSimIndex.markersById.get(s.student_id);
+                    if (!marker) continue;
+                    const seg = findActiveSegment(s.segments, studentSimSimMinute);
+                    const ratio = (studentSimSimMinute - seg.startM) / (seg.endM - seg.startM);
+                    const latlng = interpLatLng(seg.latlngs, ratio);
+                    if (latlng) marker.setLatLng(latlng);
+                }
+            }
+            updateStudentSimHud();
+            studentSimRaf = requestAnimationFrame(studentSimTick);
         }
 
         async function runSitingOptimize() {
@@ -782,9 +1201,34 @@
                 const resp = await fetch(`${apiBaseUrl}/dispatch/optimize`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ period: currentPeriod, algorithm_type: 'GA' })
+                    body: JSON.stringify((() => {
+                        const manualSites = MapEngine.getManualSites();
+                        const isManualScheme = !!document.getElementById('layerManualCoverage')?.checked;
+
+                        const smartSites = (sitingResult?.optimal_sites?.features || [])
+                            .map(f => ({
+                                site_id: f?.properties?.site_id,
+                                name: f?.properties?.name,
+                                latitude: f?.geometry?.coordinates?.[1],
+                                longitude: f?.geometry?.coordinates?.[0],
+                                capacity: f?.properties?.capacity || 0
+                            }))
+                            .filter(s => typeof s.latitude === 'number' && typeof s.longitude === 'number');
+
+                        const current_sites = isManualScheme
+                            ? manualSites
+                            : (smartSites.length > 0 ? smartSites : manualSites);
+
+                        return {
+                            period: currentPeriod,
+                            algorithm_type: 'GA',
+                            include_process: true,
+                            current_sites
+                        };
+                    })())
                 });
                 dispatchResult = await resp.json();
+                MapEngine.clearDispatch();
                 MapEngine.setDispatchOptimizeResponse(dispatchResult);
                 refreshAll();
                 showToast('调度优化完成', 'success');
